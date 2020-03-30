@@ -304,7 +304,8 @@ struct Parser {
     L.expect(TK_WHAT);
     TreeList stmts;
     stmts.push_back(parseStmt());
-    assert((stmts.size() == 1) && "expect single stmt for what");
+    if (stmts.size() > 1)
+      throw ErrorReport(stmts[0]) << "what clause expect single stmt\n";
     L.expect(TK_HOW);
     while (!L.nextIf('}')) {
       stmts.push_back(parseStmt());
