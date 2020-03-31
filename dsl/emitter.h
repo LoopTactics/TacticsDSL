@@ -6,10 +6,22 @@
 #include "llvm/Support/raw_ostream.h"
 #include <map>
 
+enum class Trans { N, T };
+
 struct MatMulInfo {
   std::string C;
   std::string A;
   std::string B;
+
+  Trans transa;
+  Trans transb;
+
+  int alpha;
+  int beta;
+
+  int dimensionsForM;
+  int dimensionsForN;
+  int dimensionsForK;
 };
 
 struct ReshapeInfo {
@@ -67,8 +79,8 @@ public:
   void emitReshape(const ReshapeInfo &rti);
 
   // Transpose
-  // bool matchAndEmitTranspose();
-  // bool matchTranspose(ReshapeAndTransposeInfo &rti);
+  bool matchAndEmitTranspose();
+  bool matchTranspose(TransposeInfo &rti);
   void emitTranspose(const TransposeInfo &rti);
 
 private:

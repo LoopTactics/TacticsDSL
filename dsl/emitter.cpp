@@ -25,8 +25,32 @@ void applyRecursive(const TreeRef &tree,
     applyRecursive(e, fn);
 }
 
-// check C[i][j] += A[i][k] * B[k][j]
-bool Emitter::matchMatMul(MatMulInfo &mmi) {
+bool isTN(Comprehension c, MatMulInfo &mmi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _A = m_ArrayPlaceholder();
+  auto _B = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto _k = m_Placeholder();
+  auto a = m_Access(_A({_k, _i}));
+  auto b = m_Access(_B({_k, _j}));
+  auto matcher = m_Mul(a, b);
+  if (!matcher.match(c.rhs()))
+    return false;
+  auto C = c.ident().name();
+  if ((C == ctx[_A]) || (C == ctx[_B]))
+    return false;
+  auto indexC = c.indices();
+  if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
+    return false;
+  mmi.A = ctx[_A];
+  mmi.B = ctx[_B];
+  mmi.C = C;
+  return true;
+}
+
+bool isNN(Comprehension c, MatMulInfo &mmi) {
   using namespace matchers;
   auto ctx = m_ctx();
   auto _A = m_ArrayPlaceholder();
@@ -37,30 +61,136 @@ bool Emitter::matchMatMul(MatMulInfo &mmi) {
   auto a = m_Access(_A({_i, _k}));
   auto b = m_Access(_B({_k, _j}));
   auto matcher = m_Mul(a, b);
-
-  if (comprehension_.assignment()->kind() != TK_PLUS_EQ)
+  if (!matcher.match(c.rhs()))
     return false;
-  if (comprehension_.indices().size() != 2)
-    return false;
-  auto rhs = comprehension_.rhs();
-  if (!matcher.match(rhs))
-    return false;
-  auto C = comprehension_.ident().name();
+  auto C = c.ident().name();
   if ((C == ctx[_A]) || (C == ctx[_B]))
     return false;
-  auto indexC = comprehension_.indices();
+  auto indexC = c.indices();
   if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
     return false;
-
-  // fill mmi.
   mmi.A = ctx[_A];
   mmi.B = ctx[_B];
   mmi.C = C;
   return true;
 }
 
+bool isNT(Comprehension c, MatMulInfo &mmi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _A = m_ArrayPlaceholder();
+  auto _B = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto _k = m_Placeholder();
+  auto a = m_Access(_A({_i, _k}));
+  auto b = m_Access(_B({_j, _k}));
+  auto matcher = m_Mul(a, b);
+  if (!matcher.match(c.rhs()))
+    return false;
+  auto C = c.ident().name();
+  if ((C == ctx[_A]) || (C == ctx[_B]))
+    return false;
+  auto indexC = c.indices();
+  if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
+    return false;
+  mmi.A = ctx[_A];
+  mmi.B = ctx[_B];
+  mmi.C = C;
+  return true;
+}
+
+bool isTT(Comprehension c, MatMulInfo &mmi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _A = m_ArrayPlaceholder();
+  auto _B = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto _k = m_Placeholder();
+  auto a = m_Access(_A({_k, _i}));
+  auto b = m_Access(_B({_j, _k}));
+  auto matcher = m_Mul(a, b);
+  if (!matcher.match(c.rhs()))
+    return false;
+  auto C = c.ident().name();
+  if ((C == ctx[_A]) || (C == ctx[_B]))
+    return false;
+  auto indexC = c.indices();
+  if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
+    return false;
+  mmi.A = ctx[_A];
+  mmi.B = ctx[_B];
+  mmi.C = C;
+  return true;
+}
+
+// check C[i][j] += A[i][k] * B[k][j]
+bool Emitter::matchMatMul(MatMulInfo &mmi) {
+  bool isEqualAssignment = false;
+  bool isPlusEqualAssignment = false;
+  if (comprehension_.assignment()->kind() == '=')
+    isEqualAssignment = true;
+  if (comprehension_.assignment()->kind() == TK_PLUS_EQ)
+    isPlusEqualAssignment = true;
+  if (!isEqualAssignment && !isPlusEqualAssignment)
+    return false;
+
+  if (comprehension_.indices().size() != 2)
+    return false;
+
+  bool matchedFlag = false;
+  bool aTransFlag = false;
+  bool bTransFlag = false;
+  if (isNN(comprehension_, mmi)) {
+    matchedFlag = true;
+  }
+  if (isTN(comprehension_, mmi)) {
+    matchedFlag = true;
+    aTransFlag = true;
+  }
+  if (isNT(comprehension_, mmi)) {
+    matchedFlag = true;
+    bTransFlag = true;
+  }
+  if (isTT(comprehension_, mmi)) {
+    matchedFlag = true;
+    aTransFlag = true;
+    bTransFlag = true;
+  }
+  if (!matchedFlag)
+    return false;
+
+  // fill mmi.
+  mmi.transa = (aTransFlag) ? Trans::T : Trans::N;
+  mmi.transb = (bTransFlag) ? Trans::T : Trans::N;
+  mmi.alpha = 1;
+  mmi.beta = (isEqualAssignment) ? 0 : 1;
+  mmi.dimensionsForM = 1;
+  mmi.dimensionsForN = 1;
+  mmi.dimensionsForK = 1;
+  return true;
+}
+
+std::string toString(Trans t) {
+  switch (t) {
+  case Trans::N:
+    return "N";
+  case Trans::T:
+    return "T";
+  }
+}
+
 void Emitter::emitMatMul(const MatMulInfo &mmi) {
-  os.indent(2) << "matmulBuilder<Inputs<["
+  os.indent(2) << "matmulBuilder<"
+               << "Trans<[\"" << toString(mmi.transa) << "\"]>, "
+               << "Trans<[\"" << toString(mmi.transb) << "\"]>, "
+               << "Dims<[" << mmi.dimensionsForM << "]>, "
+               << "Dims<[" << mmi.dimensionsForN << "]>, "
+               << "Dims<[" << mmi.dimensionsForK << "]>, "
+               << "Constant<" << mmi.alpha << ">, "
+               << "Constant<" << mmi.beta << ">, "
+               << "Inputs<["
                << "\"" << mmi.A << "\""
                << ","
                << "\"" << mmi.B << "\""
@@ -100,8 +230,8 @@ bool Emitter::matchReshape(ReshapeInfo &ri) {
     return false;
 
   // fill ri.
-  ri.rhs = comprehension_.ident().name();
-  ri.lhs = Apply(comprehension_.rhs()).name().name();
+  ri.lhs = comprehension_.ident().name();
+  ri.rhs = Apply(comprehension_.rhs()).name().name();
 
   for (const auto &elem : lhsIndexes) {
     ri.lhsIndexes.push_back(elem.name());
@@ -216,35 +346,47 @@ void Emitter::emitReshape(const ReshapeInfo &ri) {
     indexes.push_back(std::distance(lhsIndexesCpy.begin(), it));
   }
 
+  // check if we need to transpose.
+  bool requireTranspose = false;
+  auto ordering = getOrdering(lhsIndexesCpy, rhsIndexesCpy);
+  if (!isConsecutive(ordering))
+    requireTranspose = true;
+
   // if f is rhs emit first reshape and then transpose
   // if necessary.
   if (isOnRhs) {
+    std::string dest =
+        (requireTranspose) ? symbolTable_.getNextVariable() : ri.lhs;
     os.indent(2) << "reshapeBuilder<Inputs<["
-                 << "\"" << ri.lhs << "\""
+                 << "\"" << ri.rhs << "\""
                  << "]>, Outputs<["
-                 << "\"" << symbolTable_.getNextVariable() << "\""
+                 << "\"" << dest << "\""
                  << "]>, AffineExpression<{\"\"}>>,\n";
   }
 
-  // check if we need to transpose first and if so emit transpose.
-  auto ordering = getOrdering(lhsIndexesCpy, rhsIndexesCpy);
   bool emittedTranspose = false;
-  if (!isConsecutive(ordering)) {
+  if (requireTranspose) {
     if (isOnRhs)
-      emitTranspose({ri.rhs, symbolTable_.getLastEmittedVariable(), ordering});
+      emitTranspose({ri.lhs, symbolTable_.getLastEmittedVariable(), ordering});
     else
-      emitTranspose({symbolTable_.getNextVariable(), ri.lhs, ordering});
+      emitTranspose({symbolTable_.getNextVariable(), ri.rhs, ordering});
     emittedTranspose = true;
   }
 
   if (isOnLhs) {
     auto newLhs =
         (emittedTranspose) ? symbolTable_.getLastEmittedVariable() : ri.lhs;
-    os.indent(2) << "reshapeBuilder<Inputs<["
-                 << "\"" << newLhs << "\""
-                 << "]>, Outputs<["
-                 << "\"" << ri.rhs << "\""
-                 << "]>, AffineExpression<\"{";
+    os.indent(2) << "reshapeBuilder<Inputs<[";
+    if (!emittedTranspose) {
+      os << "\"" << ri.rhs << "\""
+         << "]>, Outputs<["
+         << "\"" << newLhs << "\"";
+    } else {
+      os << "\"" << newLhs << "\""
+         << "]>, Outputs<["
+         << "\"" << ri.lhs << "\"";
+    }
+    os << "]>, AffineExpression<\"{";
     for (size_t i = 0; i < indexes.size(); i++) {
       if (i == indexes.size() - 1)
         os << indexes[i];
@@ -280,38 +422,54 @@ void Emitter::emitTranspose(const TransposeInfo &ti) {
   os << "}\">>,\n";
 }
 
-// bool Emitter::matchTranspose(ReshapeAndTransposeInfo &rti) {
-//  using namespace lang;
-//  if (comprehension_.assignment()->kind() != '=')
-//    return false;
-//  auto rhs = comprehension_.rhs();
-//  int rhsOperands = 0;
-//  applyRecursive(rhs, [&](const TreeRef &t) {
-//    if (t->kind() == TK_APPLY)
-//      rhsOperands++;
-//  });
-//  if (rhsOperands != 1)
-//    return false;
-//  auto lhsIndexes = comprehension_.indices();
-//  auto rhsIndexes = Apply(rhs).arguments();
-//  if (lhsIndexes.size() != rhsIndexes.size())
-//    return false;
-//  return true;
-//}
+bool Emitter::matchTranspose(TransposeInfo &rti) {
+  if (comprehension_.assignment()->kind() != '=')
+    return false;
+  auto rhs = comprehension_.rhs();
+  int rhsOperands = 0;
+  applyRecursive(rhs, [&](const TreeRef &t) {
+    if (t->kind() == TK_APPLY)
+      rhsOperands++;
+  });
+  if (rhsOperands != 1)
+    return false;
+  auto lhsIndexes = comprehension_.indices();
+  auto rhsIndexes = Apply(rhs).arguments();
+  if (lhsIndexes.size() != rhsIndexes.size())
+    return false;
+  // not where clause allowed.
+  auto where = comprehension_.whereClauses();
+  if (where.size() != 0)
+    return false;
+  std::vector<std::string> lhsIndexesAsStr, rhsIndexesAsStr;
+  for (const auto &elem : lhsIndexes)
+    lhsIndexesAsStr.push_back(elem.name());
+  for (const auto &elem : rhsIndexes)
+    rhsIndexesAsStr.push_back(Ident(elem).name());
+  if (!find(lhsIndexesAsStr, rhsIndexesAsStr))
+    return false;
+  // fill rti.
+  rti.lhs = comprehension_.ident().name();
+  rti.rhs = Apply(rhs).name().name();
+  rti.permutation = getOrdering(rhsIndexesAsStr, lhsIndexesAsStr);
+  return true;
+}
 
-// bool Emitter::matchAndEmitTranspose() {
-//  ReshapeAndTransposeInfo rti;
-//  if (matchTranspose(rti)) {
-//    emitTranspose(rti);
-//    return true;
-//  }
-//  return false;
-//}
+bool Emitter::matchAndEmitTranspose() {
+  TransposeInfo rti;
+  if (matchTranspose(rti)) {
+    emitTranspose(rti);
+    return true;
+  }
+  return false;
+}
 
 void Emitter::emitHow() {
   if (matchAndEmitMatmul())
     return;
   if (matchAndEmitReshape())
+    return;
+  if (matchAndEmitTranspose())
     return;
   throw ErrorReport(comprehension_) << "unknown builder";
 }
