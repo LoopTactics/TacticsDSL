@@ -13,6 +13,10 @@ struct MatMulInfo {
   std::string A;
   std::string B;
 
+  std::string m;
+  std::string n;
+  std::string k;
+
   Trans transa;
   Trans transb;
 

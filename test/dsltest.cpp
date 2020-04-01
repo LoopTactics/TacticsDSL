@@ -293,7 +293,7 @@ TEST(DslTest, shouldHaveBetaSetToZero) {
 
 // Execute the tensor using a *single*
 // gemm call.
-TEST(DslTest, shouldBeLoweredToAGemmCall) {
+TEST(DslTest, shouldBeLoweredToAGemmCallThirdOrderTensors) {
 
   std::string raw = R"(
   def GEMM {
@@ -303,6 +303,56 @@ TEST(DslTest, shouldBeLoweredToAGemmCall) {
     C(m, f) = A(m, k) * B(k, f) where f = n * p
   }
   )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) = A(m, k) * B(k, n, p)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<[\"N\"]>, Trans<[\"N\"]>, Dims<[1]>, Dims<[2]>, "
+      "Dims<[1]>, Constant<1>, Constant<0>, Inputs<[\"A\",\"B\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+// Execute the tensor using a *single*
+// gemm call.
+TEST(DslTest, shouldBeLoweredToAGemmCallThirdOrderTensorWithTranspose) {
+
+  std::string raw = R"(
+  def GEMM {
+    what
+    C(m, n, p) = B(m, n, k) * A(p, k)
+    how
+    C(f, p) = B(f, k) * A(p, k) where f = m * n
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) = B(m, n, k) * A(p, k)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<[\"N\"]>, Trans<[\"T\"]>, Dims<[2]>, Dims<[1]>, "
+      "Dims<[1]>, Constant<1>, Constant<0>, Inputs<[\"B\",\"A\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
 }
 
 // This is the equivalent of the previous test

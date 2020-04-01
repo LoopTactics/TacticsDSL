@@ -47,6 +47,9 @@ bool isTN(Comprehension c, MatMulInfo &mmi) {
   mmi.A = ctx[_A];
   mmi.B = ctx[_B];
   mmi.C = C;
+  mmi.m = ctx[_i];
+  mmi.n = ctx[_j];
+  mmi.k = ctx[_k];
   return true;
 }
 
@@ -72,6 +75,9 @@ bool isNN(Comprehension c, MatMulInfo &mmi) {
   mmi.A = ctx[_A];
   mmi.B = ctx[_B];
   mmi.C = C;
+  mmi.m = ctx[_i];
+  mmi.n = ctx[_j];
+  mmi.k = ctx[_k];
   return true;
 }
 
@@ -97,6 +103,9 @@ bool isNT(Comprehension c, MatMulInfo &mmi) {
   mmi.A = ctx[_A];
   mmi.B = ctx[_B];
   mmi.C = C;
+  mmi.m = ctx[_i];
+  mmi.n = ctx[_j];
+  mmi.k = ctx[_k];
   return true;
 }
 
@@ -122,6 +131,9 @@ bool isTT(Comprehension c, MatMulInfo &mmi) {
   mmi.A = ctx[_A];
   mmi.B = ctx[_B];
   mmi.C = C;
+  mmi.m = ctx[_i];
+  mmi.n = ctx[_j];
+  mmi.k = ctx[_k];
   return true;
 }
 
@@ -161,14 +173,30 @@ bool Emitter::matchMatMul(MatMulInfo &mmi) {
   if (!matchedFlag)
     return false;
 
+  // check if there is a where clause.
+  auto where = comprehension_.whereClauses();
+  if (where.size() > 1)
+    throw ErrorReport(comprehension_) << "expect single where clause.";
+
+  int letSize = 1;
+  std::string letVar = "nullptr";
+  if (where.size() == 1) {
+    auto let = Let(where[0]);
+    letVar = let.name().name();
+    applyRecursive(let.rhs(), [&](const TreeRef &t) {
+      if (t->kind() == TK_IDENT)
+        letSize++;
+    });
+  }
+
   // fill mmi.
   mmi.transa = (aTransFlag) ? Trans::T : Trans::N;
   mmi.transb = (bTransFlag) ? Trans::T : Trans::N;
   mmi.alpha = 1;
   mmi.beta = (isEqualAssignment) ? 0 : 1;
-  mmi.dimensionsForM = 1;
-  mmi.dimensionsForN = 1;
-  mmi.dimensionsForK = 1;
+  mmi.dimensionsForM = (letVar == mmi.m) ? letSize - 1 : 1;
+  mmi.dimensionsForN = (letVar == mmi.n) ? letSize - 1 : 1;
+  mmi.dimensionsForK = (letVar == mmi.k) ? letSize - 1 : 1;
   return true;
 }
 
