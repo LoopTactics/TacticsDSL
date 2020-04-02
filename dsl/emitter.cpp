@@ -211,11 +211,11 @@ std::string toString(Trans t) {
 
 void Emitter::emitMatMul(const MatMulInfo &mmi) {
   os.indent(2) << "matmulBuilder<"
-               << "Trans<[\"" << toString(mmi.transa) << "\"]>, "
-               << "Trans<[\"" << toString(mmi.transb) << "\"]>, "
-               << "Dims<[" << mmi.dimensionsForM << "]>, "
-               << "Dims<[" << mmi.dimensionsForN << "]>, "
-               << "Dims<[" << mmi.dimensionsForK << "]>, "
+               << "Trans<\"" << toString(mmi.transa) << "\">, "
+               << "Trans<\"" << toString(mmi.transb) << "\">, "
+               << "Dims<" << mmi.dimensionsForM << ">, "
+               << "Dims<" << mmi.dimensionsForN << ">, "
+               << "Dims<" << mmi.dimensionsForK << ">, "
                << "Constant<" << mmi.alpha << ">, "
                << "Constant<" << mmi.beta << ">, "
                << "Inputs<["
