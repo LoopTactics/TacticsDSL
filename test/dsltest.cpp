@@ -100,8 +100,6 @@ TEST(DslTest, tensorWithFullBuilderSpecification) {
   emitTactic(p, S);
   S.str();
 
-  std::cout << res << std::endl;
-
   std::string pattern = "\"C(a, b, c) += A(a, c, d) * B(d, b)\"";
   std::string builder1 = "permutationBuilder<Inputs<[\"C\"]>, "
                          "Outputs<[\"D\"]>, AffineExpression<\"{0,2,1}\">>,";
@@ -155,8 +153,6 @@ TEST(DslTest, checkGemmCall) {
   raw_string_ostream S{res};
   emitTactic(p, S);
   S.str();
-
-  std::cout << res << std::endl;
 
   std::string pattern = "\"C(m, n) += A(m, k) * B(k, n)\"";
   std::string builder1 =
@@ -270,9 +266,9 @@ TEST(DslTest, shouldHaveBetaSetToZero) {
   std::string raw = R"(
   def GEMM {
     what
-    C(m, n) = A(m, k) * B(n, k)
+    C(m, n) += A(m, k) * B(n, k)
     how
-    C(m, n) = A(m, k) * B(n, k)
+    C(m, n) += A(m, k) * B(n, k)
   }
   )";
   Parser p = Parser(raw);
@@ -282,10 +278,10 @@ TEST(DslTest, shouldHaveBetaSetToZero) {
   emitTactic(p, S);
   S.str();
 
-  std::string pattern = "\"C(m, n) = A(m, k) * B(n, k)\"";
+  std::string pattern = "\"C(m, n) += A(m, k) * B(n, k)\"";
   std::string builder1 =
       "matmulBuilder<Trans<\"N\">, Trans<\"T\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<0>, Inputs<[\"A\",\"B\"]>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -297,14 +293,15 @@ TEST(DslTest, shouldHaveBetaSetToZero) {
 
 // Execute the tensor using a *single*
 // gemm call.
-TEST(DslTest, shouldBeLoweredToAGemmCallThirdOrderTensors) {
+// Case 1.1 (see Tensor Contractions with Extended BLAS Kernels on CPU and GPU)
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase1) {
 
   std::string raw = R"(
   def GEMM {
     what
-    C(m, n, p) = A(m, k) * B(k, n, p) 
+    C(m, n, p) += A(m, k) * B(k, n, p) 
     how
-    C(m, f) = A(m, k) * B(k, f) where f = n * p
+    C(m, f) += A(m, k) * B(k, f) where f = n * p
   }
   )";
   Parser p = Parser(raw);
@@ -314,10 +311,10 @@ TEST(DslTest, shouldBeLoweredToAGemmCallThirdOrderTensors) {
   emitTactic(p, S);
   S.str();
 
-  std::string pattern = "\"C(m, n, p) = A(m, k) * B(k, n, p)\"";
+  std::string pattern = "\"C(m, n, p) += A(m, k) * B(k, n, p)\"";
   std::string builder1 =
       "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<1>, Dims<2>, "
-      "Dims<1>, Constant<1>, Constant<0>, Inputs<[\"A\",\"B\"]>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -327,16 +324,15 @@ TEST(DslTest, shouldBeLoweredToAGemmCallThirdOrderTensors) {
   ASSERT_TRUE(builder1Pos != std::string::npos);
 }
 
-// Execute the tensor using a *single*
-// gemm call.
-TEST(DslTest, shouldBeLoweredToAGemmCallThirdOrderTensorWithTranspose) {
+// Case 1.5
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase2) {
 
   std::string raw = R"(
   def GEMM {
-    what
-    C(m, n, p) = B(m, n, k) * A(p, k)
+    what 
+    C(m, n, p) += A(m, k) * B(n, p, k)
     how
-    C(f, p) = B(f, k) * A(p, k) where f = m * n
+    C(m, f) += A(m, k) * B(f, k) where f = n * p
   }
   )";
   Parser p = Parser(raw);
@@ -346,10 +342,196 @@ TEST(DslTest, shouldBeLoweredToAGemmCallThirdOrderTensorWithTranspose) {
   emitTactic(p, S);
   S.str();
 
-  std::string pattern = "\"C(m, n, p) = B(m, n, k) * A(p, k)\"";
+  std::string pattern = "\"C(m, n, p) += A(m, k) * B(n, p, k)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<\"N\">, Trans<\"T\">, Dims<1>, Dims<2>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+// Case 2.1
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase3) {
+
+  std::string raw = R"(
+  def GEMM {
+    what
+    C(m, n, p) += A(k, m) * B(k, n, p)
+    how
+    C(m, f) += A(k, m) * B(k, f) where f = n * p
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) += A(k, m) * B(k, n, p)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<\"T\">, Trans<\"N\">, Dims<1>, Dims<2>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+// Case 2.5
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase4) {
+
+  std::string raw = R"(
+  def GEMM {
+    what 
+    C(m, n, p) += A(k, m) * B(n, p, k)
+    how
+    C(m, f) += A(k, m) * B(f, k) where f = n * p
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) += A(k, m) * B(n, p, k)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<\"T\">, Trans<\"T\">, Dims<1>, Dims<2>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+// Case 5.1
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase5) {
+
+  std::string raw = R"(
+  def GEMM {
+    what 
+    C(m, n, p) += B(k, m, n) * A(p, k)
+    how
+    C(f, p) += B(k, f) * A(p, k) where f = m * n
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) += B(k, m, n) * A(p, k)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<\"T\">, Trans<\"T\">, Dims<2>, Dims<1>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+// Case 5.5
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase6) {
+
+  std::string raw = R"(
+  def GEMM {
+    what
+    C(m, n, p) += B(m, n, k) * A(p, k)
+    how
+    C(f, p) += B(f, k) * A(p, k) where f = m * n
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) += B(m, n, k) * A(p, k)\"";
   std::string builder1 =
       "matmulBuilder<Trans<\"N\">, Trans<\"T\">, Dims<2>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<0>, Inputs<[\"B\",\"A\"]>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+// Case 6.1
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase7) {
+
+  std::string raw = R"(
+  def GEMM {
+    what 
+    C(m, n, p) += B(k, m, n) * A(k, p)
+    how
+    C(f, p) += B(k, f) * A(k, p) where f = m * n
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) += B(k, m, n) * A(k, p)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<\"T\">, Trans<\"N\">, Dims<2>, Dims<1>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+// Case 6.5
+TEST(DslTest, shouldBeLoweredToASingleGemmCallCase8) {
+
+  std::string raw = R"(
+  def GEMM {
+    what 
+    C(m, n, p) += B(m, n, k) * A(k, p)
+    how
+    C(f, p) += B(f, k) * A(k, p) where f = m * n
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(m, n, p) += B(m, n, k) * A(k, p)\"";
+  std::string builder1 =
+      "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<2>, Dims<1>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -368,11 +550,11 @@ TEST(DslTest, shouldBeLoweredToAGemmCallAndMultipleReshapes) {
   std::string raw = R"(
   def GEMM {
     what
-    C(m, n, p) = A(m, k) * B(k, n, p)
+    C(m, n, p) += A(m, k) * B(k, n, p)
     how
     D(m, f) = C(m, n, p) where f = n * p
     E(k, f) = B(k, n, p) where f = n * p
-    D(m, f) = A(m, k) * E(k, f)
+    D(m, f) += A(m, k) * E(k, f)
     C(m, n, p) = D(m, f) where f = n * p
   }
   )";
@@ -383,14 +565,14 @@ TEST(DslTest, shouldBeLoweredToAGemmCallAndMultipleReshapes) {
   emitTactic(p, S);
   S.str();
 
-  std::string pattern = "\"C(m, n, p) = A(m, k) * B(k, n, p)\"";
+  std::string pattern = "\"C(m, n, p) += A(m, k) * B(k, n, p)\"";
   std::string builder1 = "reshapeBuilder<Inputs<[\"C\"]>, Outputs<[\"D\"]>, "
                          "AffineExpression<\"{1,2}\">>,";
   std::string builder2 = "reshapeBuilder<Inputs<[\"B\"]>, Outputs<[\"E\"]>, "
                          "AffineExpression<\"{1,2}\">>,";
   std::string builder3 =
       "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<0>, Inputs<[\"A\",\"E\"]>, "
+      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"E\"]>, "
       "Outputs<[\"D\"]>>,";
   std::string builder4 = "reshapeBuilder<Inputs<[\"D\"]>, Outputs<[\"C\"]>, "
                          "AffineExpression<{\"\"}>>,";

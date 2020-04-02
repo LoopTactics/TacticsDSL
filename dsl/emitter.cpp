@@ -139,13 +139,7 @@ bool isTT(Comprehension c, MatMulInfo &mmi) {
 
 // check C[i][j] += A[i][k] * B[k][j]
 bool Emitter::matchMatMul(MatMulInfo &mmi) {
-  bool isEqualAssignment = false;
-  bool isPlusEqualAssignment = false;
-  if (comprehension_.assignment()->kind() == '=')
-    isEqualAssignment = true;
-  if (comprehension_.assignment()->kind() == TK_PLUS_EQ)
-    isPlusEqualAssignment = true;
-  if (!isEqualAssignment && !isPlusEqualAssignment)
+  if (comprehension_.assignment()->kind() != TK_PLUS_EQ)
     return false;
 
   if (comprehension_.indices().size() != 2)
@@ -193,7 +187,7 @@ bool Emitter::matchMatMul(MatMulInfo &mmi) {
   mmi.transa = (aTransFlag) ? Trans::T : Trans::N;
   mmi.transb = (bTransFlag) ? Trans::T : Trans::N;
   mmi.alpha = 1;
-  mmi.beta = (isEqualAssignment) ? 0 : 1;
+  mmi.beta = 1;
   mmi.dimensionsForM = (letVar == mmi.m) ? letSize - 1 : 1;
   mmi.dimensionsForN = (letVar == mmi.n) ? letSize - 1 : 1;
   mmi.dimensionsForK = (letVar == mmi.k) ? letSize - 1 : 1;
