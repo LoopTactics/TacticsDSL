@@ -301,14 +301,21 @@ struct Parser {
     auto name = parseIdent();
     L.expect('{');
     auto r = L.cur().range;
-    L.expect(TK_WHAT);
+    bool needHow = false;
+    if (L.cur().kind == TK_WHAT) {
+      needHow = true;
+      L.next();
+    } else
+      L.expect(TK_WHAT_AND_HOW);
     TreeList stmts;
     stmts.push_back(parseStmt());
     if (stmts.size() > 1)
       throw ErrorReport(stmts[0]) << "what clause expect single stmt\n";
-    L.expect(TK_HOW);
-    while (!L.nextIf('}')) {
-      stmts.push_back(parseStmt());
+    if (needHow) {
+      L.expect(TK_HOW);
+      while (!L.nextIf('}')) {
+        stmts.push_back(parseStmt());
+      }
     }
     auto stmts_list = List::create(r, std::move(stmts));
     return Tac::create(name->range(), name, stmts_list);

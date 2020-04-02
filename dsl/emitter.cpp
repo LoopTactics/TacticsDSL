@@ -528,6 +528,9 @@ static void recursivelyEmitRhs(const TreeRef &t, llvm::raw_ostream &os) {
 }
 
 void Emitter::emitWhat() {
+  if (comprehension_.whereClauses().size())
+    throw ErrorReport(comprehension_)
+        << "what part cannot have 'where' clauses";
   auto lhs = comprehension_.ident().name();
   auto lhsIndexes = comprehension_.indices();
   auto assignment = comprehension_.assignment();

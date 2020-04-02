@@ -18,8 +18,13 @@ void emitTactic(Parser &p, llvm::raw_ostream &os) {
   Emitter(stmts[0], os).emitWhat();
   os << ", [\n";
 
-  for (size_t i = 1; i < stmts.size(); i++) {
-    Emitter(stmts[i], os).emitHow();
+  // what = how
+  if (stmts.size() == 1)
+    Emitter(stmts[0], os).emitHow();
+  else {
+    for (size_t i = 1; i < stmts.size(); i++) {
+      Emitter(stmts[i], os).emitHow();
+    }
   }
   os.indent(2) << "eraseOpBuilder\n";
   os << "]>;\n";
@@ -141,9 +146,7 @@ TEST(DslTest, checkGemmCall) {
 
   std::string raw = R"(
   def GEMM {
-    what 
-    C(m, n) += A(m, k) * B(k, n)
-    how
+    what = how 
     C(m, n) += A(m, k) * B(k, n)
   }
   )";
@@ -172,9 +175,7 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForB) {
 
   std::string raw = R"(
   def GEMM {
-    what
-    C(i, j) += A(i, k) * B(j, k)
-    how
+    what = how
     C(i, j) += A(i, k) * B(j, k)
   }
   )";
@@ -203,9 +204,7 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForA) {
 
   std::string raw = R"(
   def GEMM {
-    what
-    C(i, j) += A(k, i) * B(k, j)
-    how 
+    what = how
     C(i, j) += A(k, i) * B(k, j)
   }
   )";
@@ -234,9 +233,7 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForAandB) {
 
   std::string raw = R"(
   def GEMM {
-    what
-    C(i, j) += A(k, i) * B(j, k)
-    how 
+    what = how
     C(i, j) += A(k, i) * B(j, k)
   }
   )";
@@ -265,9 +262,7 @@ TEST(DslTest, shouldHaveBetaSetToZero) {
 
   std::string raw = R"(
   def GEMM {
-    what
-    C(m, n) += A(m, k) * B(n, k)
-    how
+    what = how
     C(m, n) += A(m, k) * B(n, k)
   }
   )";
@@ -592,3 +587,4 @@ TEST(DslTest, shouldBeLoweredToAGemmCallAndMultipleReshapes) {
   ASSERT_TRUE(builder4Pos != std::string::npos);
   ASSERT_TRUE(builder5Pos != std::string::npos);
 }
+

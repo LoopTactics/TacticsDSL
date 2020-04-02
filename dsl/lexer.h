@@ -39,6 +39,7 @@ namespace lang {
 #define TC_FORALL_TOKEN_KINDS(_)                                               \
   _(TK_WHAT, "what", "what")                                                   \
   _(TK_HOW, "how", "how")                                                      \
+  _(TK_WHAT_AND_HOW, "what = how", "what = how")                               \
   _(TK_EOF, "eof", "")                                                         \
   _(TK_NUMBER, "number", "")                                                   \
   _(TK_BOOL_VALUE, "bool_value", "")                                           \
