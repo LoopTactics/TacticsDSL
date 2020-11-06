@@ -201,17 +201,19 @@ std::string toString(Trans t) {
   case Trans::T:
     return "T";
   }
+  assert(0 && "invalid case");
+  return "null";
 }
 
 void Emitter::emitMatMul(const MatMulInfo &mmi) {
   os.indent(2) << "matmulBuilder<"
-               << "Trans<\"" << toString(mmi.transa) << "\">, "
-               << "Trans<\"" << toString(mmi.transb) << "\">, "
-               << "Dims<" << mmi.dimensionsForM << ">, "
-               << "Dims<" << mmi.dimensionsForN << ">, "
-               << "Dims<" << mmi.dimensionsForK << ">, "
-               << "Constant<" << mmi.alpha << ">, "
-               << "Constant<" << mmi.beta << ">, "
+               << "StrExpr<\"" << toString(mmi.transa) << "\">, "
+               << "StrExpr<\"" << toString(mmi.transb) << "\">, "
+               << "M<" << mmi.dimensionsForM << ">, "
+               << "N<" << mmi.dimensionsForN << ">, "
+               << "K<" << mmi.dimensionsForK << ">, "
+               << "Constant<\"" << mmi.alpha << "\">, "
+               << "Constant<\"" << mmi.beta << "\">, "
                << "Inputs<["
                << "\"" << mmi.A << "\""
                << ","
@@ -383,7 +385,7 @@ void Emitter::emitReshape(const ReshapeInfo &ri) {
                  << "\"" << ri.rhs << "\""
                  << "]>, Outputs<["
                  << "\"" << dest << "\""
-                 << "]>, AffineExpression<{\"\"}>>,\n";
+                 << "]>, StrExpr<{\"\"}>>,\n";
   }
 
   bool emittedTranspose = false;
@@ -408,7 +410,7 @@ void Emitter::emitReshape(const ReshapeInfo &ri) {
          << "]>, Outputs<["
          << "\"" << ri.lhs << "\"";
     }
-    os << "]>, AffineExpression<\"{";
+    os << "]>, StrExpr<\"{";
     for (size_t i = 0; i < indexes.size(); i++) {
       if (i == indexes.size() - 1)
         os << indexes[i];
@@ -433,7 +435,7 @@ void Emitter::emitTranspose(const TransposeInfo &ti) {
                << "\"" << ti.rhs << "\""
                << "]>, Outputs<["
                << "\"" << ti.lhs << "\""
-               << "]>, AffineExpression<"
+               << "]>, StrExpr<"
                << "\"{";
   for (size_t i = 0; i < ti.permutation.size(); i++) {
     if (i == ti.permutation.size() - 1)
@@ -528,6 +530,7 @@ static void recursivelyEmitRhs(const TreeRef &t, llvm::raw_ostream &os) {
 }
 
 void Emitter::emitWhat() {
+  os << "def Tactic : Tactics<";
   if (comprehension_.whereClauses().size())
     throw ErrorReport(comprehension_)
         << "what part cannot have 'where' clauses";
@@ -556,5 +559,5 @@ void Emitter::emitWhat() {
 
   auto rhs = comprehension_.rhs();
   recursivelyEmitRhs(rhs, os);
-  os << "\"";
+  os << "\", \n";
 }

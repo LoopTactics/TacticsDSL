@@ -13,23 +13,18 @@ using namespace lang;
 
 void emitTactic(ListView<Comprehension> stmts, llvm::raw_ostream &os) {
   llvm::emitSourceFileHeader("Tactics", os);
-
+  if (stmts.size() < 2)
+    return;
+  Emitter(stmts[0], os).emitWhat();
   for (size_t i = 1; i < stmts.size(); i++) {
-    BuilderEmitter(stmts[i], os).emit();
+    Emitter(stmts[i], os).emitHow();
   }
+  os << "eraseOpBuilder \n";
+  os << "]>;";
 }
 
 int main() {
-  /*
-    cl::opt<std::string> outputFileName("o", cl::desc("Specify output
-    filename"), cl::value_desc("out")); cl::opt<std::string> inputFileName(
-        cl::Positional, cl::desc("<Specify input file>"), cl::Required);
-    cl::ParseCommandLineOptions(argc, argv);
 
-    std::ifstream inputFile(inputFileName);
-    if (!inputFile.good())
-      return -1;
-  */
   std::string raw = R"(
   def TTGT {
     what
