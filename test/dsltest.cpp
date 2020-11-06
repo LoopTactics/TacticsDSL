@@ -52,19 +52,19 @@ TEST(DslTest, tensorWithCompactBuilder) {
 
   std::string pattern = "\"C(a, b, c) += A(a, c, d) * B(d, b)\"";
   std::string builder1 = "permutationBuilder<Inputs<[\"C\"]>, "
-                         "Outputs<[\"tmp0\"]>, AffineExpression<\"{0,2,1}\">>,";
+                         "Outputs<[\"tmp0\"]>, StrExpr<\"{0,2,1}\">>,";
   std::string builder2 = "reshapeBuilder<Inputs<[\"tmp0\"]>, Outputs<[\"D\"]>, "
-                         "AffineExpression<\"{0,1}\">>,";
+                         "StrExpr<\"{0,1}\">>,";
   std::string builder3 = "reshapeBuilder<Inputs<[\"A\"]>, Outputs<[\"E\"]>, "
-                         "AffineExpression<\"{0,1}\">>,";
+                         "StrExpr<\"{0,1}\">>,";
   std::string builder4 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"E\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"E\",\"B\"]>, "
       "Outputs<[\"D\"]>>,";
   std::string builder5 = "reshapeBuilder<Inputs<[\"D\"]>, Outputs<[\"tmp1\"]>, "
-                         "AffineExpression<{\"\"}>>,";
+                         "StrExpr<{\"\"}>>,";
   std::string builder6 = "permutationBuilder<Inputs<[\"tmp1\"]>, "
-                         "Outputs<[\"C\"]>, AffineExpression<\"{0,2,1}\">>,";
+                         "Outputs<[\"C\"]>, StrExpr<\"{0,2,1}\">>,";
   std::string builder7 = "eraseOpBuilder";
 
   auto patternPos = res.find(pattern);
@@ -107,19 +107,19 @@ TEST(DslTest, tensorWithFullBuilderSpecification) {
 
   std::string pattern = "\"C(a, b, c) += A(a, c, d) * B(d, b)\"";
   std::string builder1 = "permutationBuilder<Inputs<[\"C\"]>, "
-                         "Outputs<[\"D\"]>, AffineExpression<\"{0,2,1}\">>,";
+                         "Outputs<[\"D\"]>, StrExpr<\"{0,2,1}\">>,";
   std::string builder2 = "reshapeBuilder<Inputs<[\"D\"]>, Outputs<[\"E\"]>, "
-                         "AffineExpression<\"{0,1}\">>,";
+                         "StrExpr<\"{0,1}\">>,";
   std::string builder3 = "reshapeBuilder<Inputs<[\"A\"]>, Outputs<[\"F\"]>, "
-                         "AffineExpression<\"{0,1}\">>,";
+                         "StrExpr<\"{0,1}\">>,";
   std::string builder4 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"F\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"F\",\"B\"]>, "
       "Outputs<[\"E\"]>>,";
   std::string builder5 = "reshapeBuilder<Inputs<[\"E\"]>, Outputs<[\"tmp2\"]>, "
-                         "AffineExpression<{\"\"}>>,";
+                         "StrExpr<{\"\"}>>,";
   std::string builder6 = "permutationBuilder<Inputs<[\"tmp2\"]>, "
-                         "Outputs<[\"C\"]>, AffineExpression<\"{0,2,1}\">>,";
+                         "Outputs<[\"C\"]>, StrExpr<\"{0,2,1}\">>,";
   std::string builder7 = "eraseOpBuilder";
 
   auto patternPos = res.find(pattern);
@@ -159,8 +159,8 @@ TEST(DslTest, checkGemmCall) {
 
   std::string pattern = "\"C(m, n) += A(m, k) * B(k, n)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -171,7 +171,7 @@ TEST(DslTest, checkGemmCall) {
 }
 
 // Check transposition.
-TEST(DslTest, shouldBeLoweredToATransposeGemmCallForB) {
+TEST(DslTest, shouldBeLoweredToAStrExprposeGemmCallForB) {
 
   std::string raw = R"(
   def GEMM {
@@ -188,8 +188,8 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForB) {
 
   std::string pattern = "\"C(i, j) += A(i, k) * B(j, k)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"T\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"T\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -200,7 +200,7 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForB) {
 }
 
 // Check transposition.
-TEST(DslTest, shouldBeLoweredToATransposeGemmCallForA) {
+TEST(DslTest, shouldBeLoweredToAStrExprposeGemmCallForA) {
 
   std::string raw = R"(
   def GEMM {
@@ -217,8 +217,8 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForA) {
 
   std::string pattern = "\"C(i, j) += A(k, i) * B(k, j)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"T\">, Trans<\"N\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"T\">, StrExpr<\"N\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -229,7 +229,7 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForA) {
 }
 
 // Check transposition.
-TEST(DslTest, shouldBeLoweredToATransposeGemmCallForAandB) {
+TEST(DslTest, shouldBeLoweredToAStrExprposeGemmCallForAandB) {
 
   std::string raw = R"(
   def GEMM {
@@ -246,8 +246,8 @@ TEST(DslTest, shouldBeLoweredToATransposeGemmCallForAandB) {
 
   std::string pattern = "\"C(i, j) += A(k, i) * B(j, k)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"T\">, Trans<\"T\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"T\">, StrExpr<\"T\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -275,8 +275,8 @@ TEST(DslTest, shouldHaveBetaSetToZero) {
 
   std::string pattern = "\"C(m, n) += A(m, k) * B(n, k)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"T\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"T\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -308,8 +308,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase1) {
 
   std::string pattern = "\"C(m, n, p) += A(m, k) * B(k, n, p)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<1>, Dims<2>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<1>, N<2>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -339,8 +339,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase2) {
 
   std::string pattern = "\"C(m, n, p) += A(m, k) * B(n, p, k)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"T\">, Dims<1>, Dims<2>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"T\">, M<1>, N<2>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -370,8 +370,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase3) {
 
   std::string pattern = "\"C(m, n, p) += A(k, m) * B(k, n, p)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"T\">, Trans<\"N\">, Dims<1>, Dims<2>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"T\">, StrExpr<\"N\">, M<1>, N<2>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -401,8 +401,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase4) {
 
   std::string pattern = "\"C(m, n, p) += A(k, m) * B(n, p, k)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"T\">, Trans<\"T\">, Dims<1>, Dims<2>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"B\"]>, "
+      "matmulBuilder<StrExpr<\"T\">, StrExpr<\"T\">, M<1>, N<2>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -432,8 +432,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase5) {
 
   std::string pattern = "\"C(m, n, p) += B(k, m, n) * A(p, k)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"T\">, Trans<\"T\">, Dims<2>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
+      "matmulBuilder<StrExpr<\"T\">, StrExpr<\"T\">, M<2>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"B\",\"A\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -463,8 +463,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase6) {
 
   std::string pattern = "\"C(m, n, p) += B(m, n, k) * A(p, k)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"T\">, Dims<2>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"T\">, M<2>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"B\",\"A\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -494,8 +494,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase7) {
 
   std::string pattern = "\"C(m, n, p) += B(k, m, n) * A(k, p)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"T\">, Trans<\"N\">, Dims<2>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
+      "matmulBuilder<StrExpr<\"T\">, StrExpr<\"N\">, M<2>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"B\",\"A\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -525,8 +525,8 @@ TEST(DslTest, shouldBeLoweredToASingleGemmCallCase8) {
 
   std::string pattern = "\"C(m, n, p) += B(m, n, k) * A(k, p)\"";
   std::string builder1 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<2>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"B\",\"A\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<2>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"B\",\"A\"]>, "
       "Outputs<[\"C\"]>>,";
 
   auto patternPos = res.find(pattern);
@@ -562,15 +562,15 @@ TEST(DslTest, shouldBeLoweredToAGemmCallAndMultipleReshapes) {
 
   std::string pattern = "\"C(m, n, p) += A(m, k) * B(k, n, p)\"";
   std::string builder1 = "reshapeBuilder<Inputs<[\"C\"]>, Outputs<[\"D\"]>, "
-                         "AffineExpression<\"{1,2}\">>,";
+                         "StrExpr<\"{1,2}\">>,";
   std::string builder2 = "reshapeBuilder<Inputs<[\"B\"]>, Outputs<[\"E\"]>, "
-                         "AffineExpression<\"{1,2}\">>,";
+                         "StrExpr<\"{1,2}\">>,";
   std::string builder3 =
-      "matmulBuilder<Trans<\"N\">, Trans<\"N\">, Dims<1>, Dims<1>, "
-      "Dims<1>, Constant<1>, Constant<1>, Inputs<[\"A\",\"E\"]>, "
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"E\"]>, "
       "Outputs<[\"D\"]>>,";
   std::string builder4 = "reshapeBuilder<Inputs<[\"D\"]>, Outputs<[\"C\"]>, "
-                         "AffineExpression<{\"\"}>>,";
+                         "StrExpr<{\"\"}>>,";
   std::string builder5 = "eraseOpBuilder";
 
   auto patternPos = res.find(pattern);
@@ -588,3 +588,30 @@ TEST(DslTest, shouldBeLoweredToAGemmCallAndMultipleReshapes) {
   ASSERT_TRUE(builder5Pos != std::string::npos);
 }
 
+TEST(DslTest, shouldBeLoweredToAGemmCallAndMultipleStrExprposesAndReshapes) {
+
+	std::string raw = R"(
+		def TENSOR {
+			what
+			C(a, b) += A(c, a, d) * B(d, c, b)
+			how
+			D(a, c, d) = A(c, a, d)
+			E(c, d, b) = B(d, c, b)
+			F(a, f) = D(a, c, d) where f = c * d
+			H(f, b) = E(c, d, b) where f = c * d
+			C(a, b) += F(a, f) * H(f, b)
+		}
+	)";
+	Parser p = Parser(raw);
+	
+	std::string res;
+	raw_string_ostream S{res};
+	emitTactic(p, S);
+	S.str();
+
+	std::string pattern = "\"C(a, b) += A(c, a, d) * B(d, c, b)\"";
+	
+	auto patternPos = res.find(pattern);
+
+	ASSERT_TRUE(patternPos != std::string::npos);
+}
