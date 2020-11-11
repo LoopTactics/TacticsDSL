@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include <iostream>
 #include <string>
+#include <cstdlib>
 
 using namespace llvm;
 using namespace lang;
@@ -614,4 +615,38 @@ TEST(DslTest, shouldBeLoweredToAGemmCallAndMultipleStrExprposesAndReshapes) {
 	auto patternPos = res.find(pattern);
 
 	ASSERT_TRUE(patternPos != std::string::npos);
+}
+
+TEST(DslTest, shouldLowerToGemm) {
+
+  std::string raw = R"(
+  def GEMM {
+    what = how
+    C(i, j) += A(i, k) * B(k, j)
+  }
+  )";
+  Parser p = Parser(raw);
+
+  std::string res;
+  raw_string_ostream S{res};
+  emitTactic(p, S);
+  S.str();
+
+  std::string pattern = "\"C(i, j) += A(i, k) * B(k, j)\"";
+  std::string builder1 =
+      "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<1>, N<1>, "
+      "K<1>, Constant<\"1\">, Constant<\"1\">, Inputs<[\"A\",\"B\"]>, "
+      "Outputs<[\"C\"]>>,";
+
+  auto patternPos = res.find(pattern);
+  auto builder1Pos = res.find(builder1);
+
+  ASSERT_TRUE(patternPos != std::string::npos);
+  ASSERT_TRUE(builder1Pos != std::string::npos);
+
+  if(const char* env = std::getenv("DUMP_TEST")) {
+    if (atoi(env) == 1)
+      std::cout << S.str() << "\n";
+  }
+
 }
