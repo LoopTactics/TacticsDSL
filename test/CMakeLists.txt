@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17.0)
+cmake_minimum_required(VERSION 3.16.0)
 
 add_executable("dsltest" dsltest.cpp)
 target_link_libraries("dsltest" dsl)
