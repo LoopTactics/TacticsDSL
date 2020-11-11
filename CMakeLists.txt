@@ -1,7 +1,7 @@
 project(dsl)
 include(ExternalProject)
 
-cmake_minimum_required(VERSION 3.17.0)
+cmake_minimum_required(VERSION 3.16.0)
 set(CMAKE_CXX_FLAGS "-Wall -pedantic -O3")
 set(CMAKE_CXX_FLAGS_DEBUG "-Wall -pedantic -O0 -g")
 set(CMAKE_CXX_STANDARD 11)
