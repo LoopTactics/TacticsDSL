@@ -17,7 +17,7 @@ void emitTactic(Parser &p, llvm::raw_ostream &os) {
   auto stmts = tac.statements();
   os << "def " << Ident(tac.name()).name() << " : Tactics<";
   Emitter(stmts[0], os).emitWhat();
-  os << ", [\n";
+  os << "[\n";
 
   // what = how
   if (stmts.size() == 1)
@@ -649,4 +649,74 @@ TEST(DslTest, shouldLowerToGemm) {
       std::cout << S.str() << "\n";
   }
 
+}
+
+TEST(DslTest, shouldLowerToMatVec) {
+
+	std::string raw = R"(
+		def GEMV {
+			what = how
+			x(i) += A(i, j) * y(j)
+		}
+	)";
+	Parser p = Parser(raw);
+	
+	std::string res;
+	raw_string_ostream S{res};
+	emitTactic(p, S);
+	S.str();
+
+	std::string pattern = "\"x(i) += A(i, j) * y(j)\"";
+	std::string builder1 =
+			"matvecBuilder<StrExpr<\"N\">, Inputs<[\"A\",\"y\"]>, Outputs<[\"x\"]>, " 
+			"Constant<\"1\">, Constant<\"1\">>,";
+	
+	auto patternPos = res.find(pattern);
+	auto builder1Pos = res.find(builder1);
+
+	ASSERT_TRUE(patternPos != std::string::npos);
+	ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+TEST(DslTest, shouldLowerToMatVecTrans) {
+
+	std::string raw = R"(
+		def GEMV {
+			what = how
+			x(i) += A(j, i) * y(j)
+		}
+	)";
+	Parser p = Parser(raw);
+	
+	std::string res;
+	raw_string_ostream S{res};
+	emitTactic(p, S);
+	S.str();
+
+	std::string pattern = "\"x(i) += A(j, i) * y(j)\"";
+	std::string builder1 =
+			"matvecBuilder<StrExpr<\"T\">, Inputs<[\"A\",\"y\"]>, Outputs<[\"x\"]>, " 
+			"Constant<\"1\">, Constant<\"1\">>,";
+	
+	auto patternPos = res.find(pattern);
+	auto builder1Pos = res.find(builder1);
+
+	ASSERT_TRUE(patternPos != std::string::npos);
+	ASSERT_TRUE(builder1Pos != std::string::npos);
+}
+
+TEST(DslTest, shouldLowerToMatVecWithConstantAlpha) {
+
+	std::string raw = R"(
+		def GEMV {
+			what = how
+			x(i) += alpha * A(i, j) * y(j)
+		}
+	)";
+	Parser p = Parser(raw);
+	
+	std::string res;
+	raw_string_ostream S{res};
+	emitTactic(p, S);
+	std::cout << S.str() << std::endl;
 }

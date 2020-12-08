@@ -80,6 +80,8 @@ bool OpAccessMatch::match(lang::TreeRef t) {
     return false;
   auto ctx = arrayPlaceholder_.placeholders_[0].context();
   for (size_t i = 0; i < args.size(); i++) {
+    if (args[i]->kind() != TK_IDENT)
+      return false;
     auto operandAtPos = Ident(args[i]).name();
     auto isValidAssign = ctx->assignToPlaceholder(
         operandAtPos, arrayPlaceholder_.placeholders_[i].id_);

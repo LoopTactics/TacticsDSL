@@ -8,6 +8,13 @@
 
 enum class Trans { N, T };
 
+// TODO add better support for conv.
+struct ConvInfo {
+  std::string out;
+  std::string filt;
+  std::string img;
+};
+
 struct MatMulInfo {
   std::string C;
   std::string A;
@@ -20,12 +27,23 @@ struct MatMulInfo {
   Trans transa;
   Trans transb;
 
-  int alpha;
-  int beta;
+  std::string alpha;
+  std::string beta;
 
   int dimensionsForM;
   int dimensionsForN;
   int dimensionsForK;
+};
+
+struct MatVecInfo {
+  std::string x;
+  std::string A;
+  std::string y;
+
+  Trans transa;
+
+  std::string alpha;
+  std::string beta;
 };
 
 struct ReshapeInfo {
@@ -36,8 +54,8 @@ struct ReshapeInfo {
   std::vector<std::string> rhsIndexes;
 
   // where part.
-  std::string newVar;
-  std::vector<std::string> oldVars;
+  std::vector<std::string> newVar;
+  std::vector<std::vector<std::string>> oldVars;
 };
 
 struct TransposeInfo {
@@ -73,19 +91,32 @@ public:
   void emitWhat();
 
   // MatMul.
-  bool matchAndEmitMatmul();
+  bool matchAndEmitMatMul();
   bool matchMatMul(MatMulInfo &mmi);
   void emitMatMul(const MatMulInfo &mmi);
+
+  // MatVec.
+  bool matchAndEmitMatVec();
+  bool matchMatVec(MatVecInfo &mvi);
+  void emitMatVec(const MatVecInfo &mvi);
 
   // Reshape.
   bool matchAndEmitReshape();
   bool matchReshape(ReshapeInfo &rti);
   void emitReshape(const ReshapeInfo &rti);
+  // TODO: remove me and handle multiple where clauses
+  // better.
+  void printGroup(const ReshapeInfo &rti);
 
   // Transpose
   bool matchAndEmitTranspose();
   bool matchTranspose(TransposeInfo &rti);
   void emitTranspose(const TransposeInfo &rti);
+
+  // Conv
+  bool matchAndEmitConv();
+  bool matchConv(ConvInfo &cvi);
+  void emitConv(const ConvInfo &cvi);
 
 private:
   lang::Comprehension comprehension_;
