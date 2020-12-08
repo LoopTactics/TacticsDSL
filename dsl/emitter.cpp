@@ -18,14 +18,14 @@ std::string SymbolTableMap::getLastEmittedVariable() const {
 
 // Resursively maps the function `fn` to `tree` and all of its
 // descendants in preorder - teckyl style.
-void applyRecursive(const TreeRef &tree,
-                    std::function<void(const TreeRef &)> fn) {
+static void applyRecursive(const TreeRef &tree,
+                           std::function<void(const TreeRef &)> fn) {
   fn(tree);
   for (auto e : tree->trees())
     applyRecursive(e, fn);
 }
 
-bool isTN(Comprehension c, MatMulInfo &mmi) {
+static bool isTN(Comprehension c, MatMulInfo &mmi) {
   using namespace matchers;
   auto ctx = m_ctx();
   auto _A = m_ArrayPlaceholder();
@@ -42,6 +42,8 @@ bool isTN(Comprehension c, MatMulInfo &mmi) {
   if ((C == ctx[_A]) || (C == ctx[_B]))
     return false;
   auto indexC = c.indices();
+  if (indexC.size() != 2)
+    return false;
   if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
     return false;
   mmi.A = ctx[_A];
@@ -50,10 +52,12 @@ bool isTN(Comprehension c, MatMulInfo &mmi) {
   mmi.m = ctx[_i];
   mmi.n = ctx[_j];
   mmi.k = ctx[_k];
+  mmi.alpha = "1";
+  mmi.beta = "1";
   return true;
 }
 
-bool isNN(Comprehension c, MatMulInfo &mmi) {
+static bool isNN(Comprehension c, MatMulInfo &mmi) {
   using namespace matchers;
   auto ctx = m_ctx();
   auto _A = m_ArrayPlaceholder();
@@ -70,6 +74,8 @@ bool isNN(Comprehension c, MatMulInfo &mmi) {
   if ((C == ctx[_A]) || (C == ctx[_B]))
     return false;
   auto indexC = c.indices();
+  if (indexC.size() != 2)
+    return false;
   if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
     return false;
   mmi.A = ctx[_A];
@@ -78,10 +84,44 @@ bool isNN(Comprehension c, MatMulInfo &mmi) {
   mmi.m = ctx[_i];
   mmi.n = ctx[_j];
   mmi.k = ctx[_k];
+  mmi.alpha = "1";
+  mmi.beta = "1";
   return true;
 }
 
-bool isNT(Comprehension c, MatMulInfo &mmi) {
+static bool isNNWithAlpha(Comprehension c, MatMulInfo &mmi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _A = m_ArrayPlaceholder();
+  auto _B = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto _k = m_Placeholder();
+  auto a = m_Access(_A({_i, _k}));
+  auto b = m_Access(_B({_k, _j}));
+  auto matcher = m_Mul(m_Any(), m_Mul(a, b));
+  if (!matcher.match(c.rhs()))
+    return false;
+  auto C = c.ident().name();
+  if ((C == ctx[_A]) || (C == ctx[_B]))
+    return false;
+  auto indexC = c.indices();
+  if (indexC.size() != 2)
+    return false;
+  if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
+    return false;
+  mmi.A = ctx[_A];
+  mmi.B = ctx[_B];
+  mmi.C = C;
+  mmi.m = ctx[_i];
+  mmi.n = ctx[_j];
+  mmi.k = ctx[_k];
+  mmi.alpha = "alpha";
+  mmi.beta = "1";
+  return true;
+}
+
+static bool isNT(Comprehension c, MatMulInfo &mmi) {
   using namespace matchers;
   auto ctx = m_ctx();
   auto _A = m_ArrayPlaceholder();
@@ -98,6 +138,8 @@ bool isNT(Comprehension c, MatMulInfo &mmi) {
   if ((C == ctx[_A]) || (C == ctx[_B]))
     return false;
   auto indexC = c.indices();
+  if (indexC.size() != 2)
+    return false;
   if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
     return false;
   mmi.A = ctx[_A];
@@ -106,10 +148,12 @@ bool isNT(Comprehension c, MatMulInfo &mmi) {
   mmi.m = ctx[_i];
   mmi.n = ctx[_j];
   mmi.k = ctx[_k];
+  mmi.alpha = "1";
+  mmi.beta = "1";
   return true;
 }
 
-bool isTT(Comprehension c, MatMulInfo &mmi) {
+static bool isTT(Comprehension c, MatMulInfo &mmi) {
   using namespace matchers;
   auto ctx = m_ctx();
   auto _A = m_ArrayPlaceholder();
@@ -126,6 +170,8 @@ bool isTT(Comprehension c, MatMulInfo &mmi) {
   if ((C == ctx[_A]) || (C == ctx[_B]))
     return false;
   auto indexC = c.indices();
+  if (indexC.size() != 2)
+    return false;
   if ((indexC[0].name() != ctx[_i]) || (indexC[1].name() != ctx[_j]))
     return false;
   mmi.A = ctx[_A];
@@ -134,10 +180,128 @@ bool isTT(Comprehension c, MatMulInfo &mmi) {
   mmi.m = ctx[_i];
   mmi.n = ctx[_j];
   mmi.k = ctx[_k];
+  mmi.alpha = "1";
+  mmi.beta = "1";
   return true;
 }
 
-// check C[i][j] += A[i][k] * B[k][j]
+static bool isN(Comprehension c, MatVecInfo &mvi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _y = m_ArrayPlaceholder();
+  auto _A = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto a = m_Access(_A({_i, _j}));
+  auto b = m_Access(_y({_j}));
+  auto matcher = m_Mul(a, b);
+  if (!matcher.match(c.rhs()))
+    return false;
+  auto x = c.ident().name();
+  if ((x == ctx[_A]) || (x == ctx[_y]))
+    return false;
+  auto indexX = c.indices();
+  if (indexX.size() != 1)
+    return false;
+  if (indexX[0].name() != ctx[_i])
+    return false;
+  mvi.A = ctx[_A];
+  mvi.y = ctx[_y];
+  mvi.x = x;
+  mvi.transa = Trans::N;
+  mvi.alpha = "1";
+  mvi.beta = "1";
+  return true;
+}
+
+static bool isNWithConstantAlpha(Comprehension c, MatVecInfo &mvi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _y = m_ArrayPlaceholder();
+  auto _A = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto a = m_Access(_A({_i, _j}));
+  auto b = m_Access(_y({_j}));
+  auto matcherWithConst = m_Mul(m_Any(), m_Mul(a, b));
+  if (!matcherWithConst.match(c.rhs()))
+    return false;
+  auto x = c.ident().name();
+  if ((x == ctx[_A]) || (x == ctx[_y]))
+    return false;
+  auto indexX = c.indices();
+  if (indexX.size() != 1)
+    return false;
+  if (indexX[0].name() != ctx[_i])
+    return false;
+  mvi.A = ctx[_A];
+  mvi.y = ctx[_y];
+  mvi.x = x;
+  mvi.transa = Trans::N;
+  mvi.alpha = "alpha";
+  mvi.beta = "1";
+  return true;
+}
+
+static bool isTWithConstantAlpha(Comprehension c, MatVecInfo &mvi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _y = m_ArrayPlaceholder();
+  auto _A = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto a = m_Access(_A({_j, _i}));
+  auto b = m_Access(_y({_j}));
+  auto matcherWithConst = m_Mul(m_Any(), m_Mul(a, b));
+  if (!matcherWithConst.match(c.rhs()))
+    return false;
+  auto x = c.ident().name();
+  if ((x == ctx[_A]) || (x == ctx[_y]))
+    return false;
+  auto indexX = c.indices();
+  if (indexX.size() != 1)
+    return false;
+  if (indexX[0].name() != ctx[_i])
+    return false;
+  mvi.A = ctx[_A];
+  mvi.y = ctx[_y];
+  mvi.x = x;
+  mvi.transa = Trans::T;
+  mvi.alpha = "alpha";
+  mvi.beta = "1";
+  return true;
+}
+
+static bool isT(Comprehension c, MatVecInfo &mvi) {
+  using namespace matchers;
+  auto ctx = m_ctx();
+  auto _y = m_ArrayPlaceholder();
+  auto _A = m_ArrayPlaceholder();
+  auto _i = m_Placeholder();
+  auto _j = m_Placeholder();
+  auto a = m_Access(_A({_j, _i}));
+  auto b = m_Access(_y({_j}));
+  auto matcher = m_Mul(a, b);
+  if (!matcher.match(c.rhs()))
+    return false;
+  auto x = c.ident().name();
+  if ((x == ctx[_A]) || (x == ctx[_y]))
+    return false;
+  auto indexX = c.indices();
+  if (indexX.size() != 1)
+    return false;
+  if (indexX[0].name() != ctx[_i])
+    return false;
+  mvi.A = ctx[_A];
+  mvi.y = ctx[_y];
+  mvi.x = x;
+  mvi.transa = Trans::T;
+  mvi.alpha = "1";
+  mvi.beta = "1";
+  return true;
+}
+
+// check if we are dealing with matmul.
 bool Emitter::matchMatMul(MatMulInfo &mmi) {
   if (comprehension_.assignment()->kind() != TK_PLUS_EQ)
     return false;
@@ -148,7 +312,7 @@ bool Emitter::matchMatMul(MatMulInfo &mmi) {
   bool matchedFlag = false;
   bool aTransFlag = false;
   bool bTransFlag = false;
-  if (isNN(comprehension_, mmi)) {
+  if (isNN(comprehension_, mmi) || isNNWithAlpha(comprehension_, mmi)) {
     matchedFlag = true;
   }
   if (isTN(comprehension_, mmi)) {
@@ -186,12 +350,25 @@ bool Emitter::matchMatMul(MatMulInfo &mmi) {
   // fill mmi.
   mmi.transa = (aTransFlag) ? Trans::T : Trans::N;
   mmi.transb = (bTransFlag) ? Trans::T : Trans::N;
-  mmi.alpha = 1;
-  mmi.beta = 1;
   mmi.dimensionsForM = (letVar == mmi.m) ? letSize - 1 : 1;
   mmi.dimensionsForN = (letVar == mmi.n) ? letSize - 1 : 1;
   mmi.dimensionsForK = (letVar == mmi.k) ? letSize - 1 : 1;
   return true;
+}
+
+// check if we are dealing with a matvec.
+bool Emitter::matchMatVec(MatVecInfo &mvi) {
+  if (comprehension_.assignment()->kind() != TK_PLUS_EQ)
+    return false;
+
+  if (comprehension_.indices().size() != 1)
+    return false;
+
+  // TODO: merge isN with isNWithTranspose once we
+  // introduce a method to clear the context.
+  return (isN(comprehension_, mvi) || isT(comprehension_, mvi) ||
+          isNWithConstantAlpha(comprehension_, mvi) ||
+          isTWithConstantAlpha(comprehension_, mvi));
 }
 
 std::string toString(Trans t) {
@@ -223,10 +400,33 @@ void Emitter::emitMatMul(const MatMulInfo &mmi) {
                << "]>>,\n";
 }
 
-bool Emitter::matchAndEmitMatmul() {
+void Emitter::emitMatVec(const MatVecInfo &mvi) {
+  os.indent(2) << "matvecBuilder<"
+               << "StrExpr<\"" << toString(mvi.transa) << "\">, "
+               << "Inputs<["
+               << "\"" << mvi.A << "\""
+               << ","
+               << "\"" << mvi.y << "\""
+               << "]>, Outputs<["
+               << "\"" << mvi.x << "\""
+               << "]>, "
+               << "Constant<\"" << mvi.alpha << "\">, "
+               << "Constant<\"" << mvi.beta << "\">>, \n";
+}
+
+bool Emitter::matchAndEmitMatMul() {
   MatMulInfo mmi;
   if (matchMatMul(mmi)) {
     emitMatMul(mmi);
+    return true;
+  }
+  return false;
+}
+
+bool Emitter::matchAndEmitMatVec() {
+  MatVecInfo mvi;
+  if (matchMatVec(mvi)) {
+    emitMatVec(mvi);
     return true;
   }
   return false;
@@ -244,14 +444,16 @@ bool Emitter::matchReshape(ReshapeInfo &ri) {
   });
   if (rhsOperands != 1)
     return false;
+
   auto lhsIndexes = comprehension_.indices();
   auto rhsIndexes = Apply(rhs).arguments();
   if (lhsIndexes.size() == rhsIndexes.size())
     return false;
+
   // all the reshape operation must have one where clause.
   auto where = comprehension_.whereClauses();
-  if (where.size() != 1)
-    return false;
+  // if (where.size() != 1)
+  //  return false;
 
   // fill ri.
   ri.lhs = comprehension_.ident().name();
@@ -264,14 +466,18 @@ bool Emitter::matchReshape(ReshapeInfo &ri) {
     ri.rhsIndexes.push_back(Ident(elem).name());
   }
 
-  auto let = Let(where[0]);
-  ri.newVar = let.name().name();
-  applyRecursive(let.rhs(), [&](const TreeRef &t) {
-    if (t->kind() == TK_IDENT)
-      ri.oldVars.push_back(Ident(t).name());
-  });
-  if (ri.oldVars.size() < 2)
-    throw ErrorReport(let) << "rhs of where expect one or more variable";
+  for (size_t i = 0; i < where.size(); i++) {
+    auto let = Let(where[i]);
+    ri.newVar.push_back(let.name().name());
+    std::vector<std::string> tmp;
+    applyRecursive(let.rhs(), [&tmp](const TreeRef &t) {
+      if (t->kind() == TK_IDENT)
+        tmp.push_back(Ident(t).name());
+    });
+    if (tmp.size() < 2)
+      throw ErrorReport(let) << "rhs of where expect one or more variable";
+    ri.oldVars.push_back(tmp);
+  }
   return true;
 }
 
@@ -336,21 +542,146 @@ std::vector<std::string> reorder(const std::vector<std::string> &indexes,
   return res;
 }
 
+std::string getReshapeMap(const std::vector<size_t> &toReshape,
+                          const std::vector<size_t> &notToReshape) {
+  assert(toReshape.size());
+  assert(notToReshape.size());
+  std::string res = "\"{";
+  auto itReshape = std::find(toReshape.begin(), toReshape.end(), 0);
+  auto itNotReshape = std::find(notToReshape.begin(), notToReshape.end(), 0);
+  if ((itReshape == toReshape.end()) && (itNotReshape == notToReshape.end()))
+    assert(0 && "cannot find zero dimension");
+
+  if (itReshape != toReshape.end()) {
+    res += "{";
+    for (size_t i = 0; i < toReshape.size(); i++) {
+      if (i == toReshape.size() - 1) {
+        res += ", ";
+        res += std::to_string(toReshape[i]);
+      } else
+        res += std::to_string(toReshape[i]);
+    }
+    if (notToReshape.size() == 1)
+      res += "}";
+    else
+      res += "}, ";
+    for (size_t i = 0; i < notToReshape.size(); i++) {
+      if (i == notToReshape.size() - 1) {
+        res += ", ";
+        res += std::to_string(notToReshape[i]);
+      } else
+        res += std::to_string(notToReshape[i]);
+    }
+  }
+
+  else {
+    for (size_t i = 0; i < notToReshape.size(); i++) {
+      if (i == notToReshape.size() - 1 && notToReshape.size() != 1) {
+        res += ", ";
+        res += std::to_string(notToReshape[i]);
+      } else
+        res += std::to_string(notToReshape[i]);
+    }
+    if (notToReshape.size() == 1)
+      res += ", {";
+    for (size_t i = 0; i < toReshape.size(); i++) {
+      if (i == toReshape.size() - 1) {
+        res += ", ";
+        res += std::to_string(toReshape[i]);
+      } else
+        res += std::to_string(toReshape[i]);
+    }
+    res += "}";
+  }
+
+  res += "}\"";
+  return res;
+}
+
+void getReshapeGroupImpl(std::vector<std::string> oldVars,
+                         std::vector<std::string> indexes,
+                         std::vector<size_t> &group) {
+  for (auto var : oldVars) {
+    auto pos = std::find(indexes.begin(), indexes.end(), var);
+    group.push_back(std::distance(indexes.begin(), pos));
+  }
+}
+
+std::vector<std::vector<size_t>>
+getReshapeGroup(std::vector<std::string> newVar,
+                std::vector<std::vector<std::string>> oldVars,
+                std::vector<std::string> lhsIndexes,
+                std::vector<std::string> rhsIndexes) {
+  std::vector<std::vector<size_t>> res;
+  for (size_t i = 0; i < newVar.size(); i++) {
+    bool isOnLhs = find(newVar[i], lhsIndexes);
+    bool isOnRhs = find(newVar[i], rhsIndexes);
+    if (!(isOnRhs ^ isOnLhs)) {
+      assert(0 && "cannot be on lhs or rhs");
+    }
+
+    std::vector<size_t> group;
+    if (isOnLhs)
+      getReshapeGroupImpl(oldVars[i], rhsIndexes, group);
+    else
+      getReshapeGroupImpl(oldVars[i], lhsIndexes, group);
+    res.push_back(group);
+  }
+  return res;
+}
+
+std::string composeGroup(std::vector<std::vector<size_t>> groups) {
+  assert(groups.size() == 2 && "max group size == 2");
+  std::string res = "\"{";
+  for (auto group : groups) {
+    res += "{";
+    for (size_t i = 0; i < group.size(); i++) {
+      if (i == group.size() - 1)
+        res += std::to_string(group[i]);
+      else {
+        res += std::to_string(group[i]);
+        res += ", ";
+      }
+    }
+    res += "}";
+  }
+  res += "}\"";
+  return res;
+}
+
+void Emitter::printGroup(const ReshapeInfo &ri) {
+  auto groups =
+      getReshapeGroup(ri.newVar, ri.oldVars, ri.lhsIndexes, ri.rhsIndexes);
+  os.indent(2) << "reshapeBuilder<Inputs<[";
+  os << "\"" << ri.rhs << "\""
+     << "]>, Outputs<["
+     << "\"" << ri.lhs << "\"";
+  os << "]>, StrExpr<";
+  os << composeGroup(groups);
+  os << ">>,\n";
+}
+
 void Emitter::emitReshape(const ReshapeInfo &ri) {
+  assert(ri.newVar.size() == ri.oldVars.size());
+  // horrible way of handling multiple wheres
+  if (ri.newVar.size() == 2)
+    return printGroup(ri);
+
+  assert(ri.newVar.size() == 1);
   // Assuming where f = a * c
   // check if the reshape dimension (f) is on the LHS or RHS.
-  bool isOnLhs = find(ri.newVar, ri.lhsIndexes);
-  bool isOnRhs = find(ri.newVar, ri.rhsIndexes);
+  bool isOnLhs = find(ri.newVar[0], ri.lhsIndexes);
+  bool isOnRhs = find(ri.newVar[0], ri.rhsIndexes);
   if (!(isOnRhs ^ isOnLhs))
     throw ErrorReport(comprehension_)
-        << "You want to reshape " << ri.newVar
+        << "You want to reshape " << ri.newVar[0]
         << "but it is not on the LHS nor on the RHS.";
 
   // check if a and c are on the RHS if f is on the LHS and viceversa.
-  if (isOnRhs && !find(ri.oldVars, ri.lhsIndexes))
+  if (isOnRhs && !find(ri.oldVars[0], ri.lhsIndexes))
     throw ErrorReport(comprehension_)
         << "The dimensions you want to rehsape are not in the expected side";
-  if (isOnLhs && !find(ri.oldVars, ri.rhsIndexes))
+  if (isOnLhs && !find(ri.oldVars[0], ri.rhsIndexes))
     throw ErrorReport(comprehension_)
         << "The dimensions you want to rehsape are not in the expected side";
 
@@ -359,15 +690,22 @@ void Emitter::emitReshape(const ReshapeInfo &ri) {
 
   // substitute f.
   if (isOnLhs)
-    substitute(lhsIndexesCpy, ri.newVar, ri.oldVars);
+    substitute(lhsIndexesCpy, ri.newVar[0], ri.oldVars[0]);
   else
-    substitute(rhsIndexesCpy, ri.newVar, ri.oldVars);
+    substitute(rhsIndexesCpy, ri.newVar[0], ri.oldVars[0]);
 
-  std::vector<size_t> indexes;
-  for (auto elem : ri.oldVars) {
+  std::vector<size_t> indexesToReshape;
+  std::vector<size_t> indexesNotToReshape;
+  for (auto elem : ri.oldVars[0]) {
     auto it = std::find(lhsIndexesCpy.begin(), lhsIndexesCpy.end(), elem);
     assert(it != lhsIndexesCpy.end());
-    indexes.push_back(std::distance(lhsIndexesCpy.begin(), it));
+    indexesToReshape.push_back(std::distance(lhsIndexesCpy.begin(), it));
+  }
+  assert(lhsIndexesCpy.size() == rhsIndexesCpy.size());
+  for (size_t i = 0; i < lhsIndexesCpy.size(); i++) {
+    auto it = std::find(indexesToReshape.begin(), indexesToReshape.end(), i);
+    if (it == indexesToReshape.end())
+      indexesNotToReshape.push_back(i);
   }
 
   // check if we need to transpose.
@@ -379,13 +717,27 @@ void Emitter::emitReshape(const ReshapeInfo &ri) {
   // if f is rhs emit first reshape and then transpose
   // if necessary.
   if (isOnRhs) {
+    auto it =
+        std::find(ri.rhsIndexes.begin(), ri.rhsIndexes.end(), ri.newVar[0]);
+    auto dist = std::distance(ri.rhsIndexes.begin(), it);
+    indexesToReshape.clear();
+    indexesNotToReshape.clear();
+    for (size_t i = 0; i < ri.rhsIndexes.size(); i++)
+      indexesToReshape.push_back(dist++);
+    for (size_t i = 0; i < rhsIndexesCpy.size(); i++) {
+      auto it = std::find(indexesToReshape.begin(), indexesToReshape.end(), i);
+      if (it == indexesToReshape.end())
+        indexesNotToReshape.push_back(i);
+    }
     std::string dest =
         (requireTranspose) ? symbolTable_.getNextVariable() : ri.lhs;
     os.indent(2) << "reshapeBuilder<Inputs<["
                  << "\"" << ri.rhs << "\""
                  << "]>, Outputs<["
                  << "\"" << dest << "\""
-                 << "]>, StrExpr<{\"\"}>>,\n";
+                 << "]>, StrExpr<"
+                 << getReshapeMap(indexesToReshape, indexesNotToReshape)
+                 << ">>,\n";
   }
 
   bool emittedTranspose = false;
@@ -410,14 +762,9 @@ void Emitter::emitReshape(const ReshapeInfo &ri) {
          << "]>, Outputs<["
          << "\"" << ri.lhs << "\"";
     }
-    os << "]>, StrExpr<\"{";
-    for (size_t i = 0; i < indexes.size(); i++) {
-      if (i == indexes.size() - 1)
-        os << indexes[i];
-      else
-        os << indexes[i] << ",";
-    }
-    os << "}\">>,\n";
+    os << "]>, StrExpr<";
+    os << getReshapeMap(indexesToReshape, indexesNotToReshape);
+    os << ">>,\n";
   }
 }
 
@@ -431,7 +778,7 @@ bool Emitter::matchAndEmitReshape() {
 }
 
 void Emitter::emitTranspose(const TransposeInfo &ti) {
-  os.indent(2) << "permutationBuilder<Inputs<["
+  os.indent(2) << "transposeBuilder<Inputs<["
                << "\"" << ti.rhs << "\""
                << "]>, Outputs<["
                << "\"" << ti.lhs << "\""
@@ -488,13 +835,56 @@ bool Emitter::matchAndEmitTranspose() {
   return false;
 }
 
+// TODO: better handling for conv.
+bool Emitter::matchConv(ConvInfo &cvi) {
+  if (comprehension_.assignment()->kind() != TK_PLUS_EQ)
+    return false;
+
+  if (comprehension_.indices().size() != 2)
+    return false;
+
+  cvi.out = comprehension_.ident().name();
+  cvi.filt = Apply(comprehension_.rhs()->trees().at(0)).name().name();
+  cvi.img = Apply(comprehension_.rhs()->trees().at(1)).name().name();
+  return true;
+}
+
+void Emitter::emitConv(const ConvInfo &cvi) {
+  os.indent(2) << "convBuilder<"
+               << "Inputs<["
+               << "\"" << cvi.filt << "\""
+               << ", "
+               << "\"" << cvi.img << "\""
+               << "]>, Outputs<["
+               << "\"" << cvi.out << "\""
+               << "]>, StrExpr<\"{1, 1, 1, 1}\">, StrExpr<\"{0, 0}\">>,\n";
+  return;
+}
+
+bool Emitter::matchAndEmitConv() {
+  ConvInfo cvi;
+  if (matchConv(cvi)) {
+    emitConv(cvi);
+    return true;
+  }
+  return false;
+}
+
 void Emitter::emitHow() {
-  if (matchAndEmitMatmul())
+
+  if (matchAndEmitMatMul())
     return;
+  if (matchAndEmitMatVec())
+    return;
+
   if (matchAndEmitReshape())
     return;
   if (matchAndEmitTranspose())
     return;
+
+  if (matchAndEmitConv())
+    return;
+
   throw ErrorReport(comprehension_) << "unknown builder";
 }
 
@@ -517,16 +907,31 @@ static void recursivelyEmitRhs(const TreeRef &t, llvm::raw_ostream &os) {
     os << name << "(";
     auto indices = Apply(t).arguments();
     for (size_t i = 0; i < indices.size(); i++) {
-      if (i == indices.size() - 1)
-        os << Ident(indices[i]).name();
-      else
-        os << Ident(indices[i]).name() << ", ";
+      if (indices[i]->kind() != TK_IDENT) {
+        if (i == indices.size() - 1)
+          recursivelyEmitRhs(indices[i], os);
+        else {
+          recursivelyEmitRhs(indices[i], os);
+          os << ", ";
+        }
+      } else {
+        if (i == indices.size() - 1)
+          os << Ident(indices[i]).name();
+        else
+          os << Ident(indices[i]).name() << ", ";
+      }
     }
     os << ")";
     return;
   }
+  case TK_IDENT: {
+    os << Ident(t).name();
+    return;
   }
-  throw ErrorReport(t) << "expect only TK_APPLY, '+' and '*'";
+  }
+  throw ErrorReport(t) << "expect only TK_APPLY, TK_IDENT, '+' and '*' but "
+                          "got"
+                       << t->kind() << "\n";
 }
 
 void Emitter::emitWhat() {
