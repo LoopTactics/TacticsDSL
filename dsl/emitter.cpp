@@ -632,7 +632,7 @@ getReshapeGroup(std::vector<std::string> newVar,
 
 std::string composeGroup(std::vector<std::vector<size_t>> groups) {
   assert(groups.size() == 2 && "max group size == 2");
-  std::string res = "{";
+  std::string res = "\"{";
   for (auto group : groups) {
     res += "{";
     for (size_t i = 0; i < group.size(); i++) {
@@ -645,7 +645,7 @@ std::string composeGroup(std::vector<std::vector<size_t>> groups) {
     }
     res += "}";
   }
-  res += "}";
+  res += "}\"";
   return res;
 }
 

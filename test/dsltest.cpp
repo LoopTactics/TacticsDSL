@@ -895,5 +895,28 @@ TEST(DslTest, should) {
 	std::string res;
 	raw_string_ostream S{res};
 	emitTactic(p, S);
-	//std::cout << S.str() << "\n";
+	S.str();
+
+	std::string builder = "transposeBuilder<Inputs<[\"A\"]>, Outputs<[\"tmp0\"]>, StrExpr<\"{0,2,1,3}\">>,";
+	std::string builder1 = "transposeBuilder<Inputs<[\"B\"]>, Outputs<[\"tmp1\"]>, StrExpr<\"{3,1,2,0}\">>,";
+	std::string builder2 = "reshapeBuilder<Inputs<[\"C\"]>, Outputs<[\"tmp2\"]>, StrExpr<\"{{0, 1}{2, 3}}\">>,";
+  std::string builder3 = "reshapeBuilder<Inputs<[\"tmp0\"]>, Outputs<[\"tmp3\"]>, StrExpr<\"{{0, 1}{2, 3}}\">>,";
+  std::string builder4 = "reshapeBuilder<Inputs<[\"tmp1\"]>, Outputs<[\"tmp4\"]>, StrExpr<\"{{0, 1}{2, 3}}\">>,";
+  std::string builder5 = "matmulBuilder<StrExpr<\"N\">, StrExpr<\"N\">, M<1>, N<1>, K<1>, Constant<\"1\">, "
+		"Constant<\"1\">, Inputs<[\"tmp3\",\"tmp4\"]>, Outputs<[\"tmp2\"]>>,";
+  std::string builder6 = "reshapeBuilder<Inputs<[\"tmp2\"]>, Outputs<[\"C\"]>, StrExpr<\"{{0, 1}{2, 3}}\">>,";
+
+	auto builder1Pos = res.find(builder1);
+	auto builder2Pos = res.find(builder2);
+	auto builder3Pos = res.find(builder3);
+	auto builder4Pos = res.find(builder4);
+	auto builder5Pos = res.find(builder5);
+	auto builder6Pos = res.find(builder6);
+
+	ASSERT_TRUE(builder1Pos != std::string::npos);
+	ASSERT_TRUE(builder2Pos != std::string::npos);	
+	ASSERT_TRUE(builder3Pos != std::string::npos);
+	ASSERT_TRUE(builder4Pos != std::string::npos);
+	ASSERT_TRUE(builder5Pos != std::string::npos);
+	ASSERT_TRUE(builder6Pos != std::string::npos);
 }
